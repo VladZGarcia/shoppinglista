@@ -11,8 +11,8 @@ import SwiftUI
 import FirebaseFirestoreSwift
 
 struct ItemList : Codable, Identifiable {
-    var  id : String = ""
-    var  listItem : String
+    @DocumentID var  id : String?
+    var  itemName : String
     var  category : String = ""
     var  isChecked : Bool = false
     
