@@ -7,12 +7,24 @@
 
 import SwiftUI
 import Firebase
+import FirebaseAuth
 
 struct ContentView: View {
     let db = Firestore.firestore()
     
     @ObservedObject var storeItems = StoreItems()
     @State var newItem : String = ""
+    @State var signedIn = false
+    
+    init() {
+        Auth.auth().signInAnonymously { authResult, error in
+            if let error = error {
+                print("error signing in \(error)")
+            } else {
+                print("Signed in \(Auth.auth().currentUser?.uid)")
+            }
+        }
+    }
     
     var searchBar : some View {
         HStack {
@@ -34,8 +46,11 @@ struct ContentView: View {
                             Text(item.itemName)
                             Spacer()
                             Button(action: {
-                                if let id = item.id {
-                                    db.collection("items").document(id).updateData(["isChecked": !item.isChecked])
+                                if let id = item.id,
+                                   let user = Auth.auth().currentUser
+                                {
+                                    db.collection("users").document(user.uid)
+                                        .collection("items").document(id).updateData(["isChecked": !item.isChecked])
                                 }
                             }) {
                                 Image(systemName: item.isChecked ? "checkmark.square" : "square")
@@ -45,8 +60,10 @@ struct ContentView: View {
                         .onDelete() { indexSet in
                             for index in indexSet {
                                 let item = storeItems.items[index]
-                                if let id = item.id {
-                                    db.collection("items").document(id).delete()
+                                if let id = item.id,
+                                   let user = Auth.auth().currentUser
+                                {
+                                    db.collection("users").document(user.uid).collection("items").document(id).delete()
                                 }
                             }
                         }
@@ -67,15 +84,18 @@ struct ContentView: View {
     
     func saveToFirestore(_ newItem: String) {
         let item = ItemList(itemName: newItem)
+        guard let user = Auth.auth().currentUser else {return}
         
         do {
-            _ = try db.collection("items").addDocument(from: item)
+            _ = try db.collection("users").document(user.uid).collection("items").addDocument(from: item)
         } catch {
             print("Error savin to DB")
         }
     }
     func listenToFirestore() {
-        db.collection("items").addSnapshotListener { snapshot, err in
+        guard let user = Auth.auth().currentUser else {return}
+        
+        db.collection("users").document(user.uid).collection("items").addSnapshotListener { snapshot, err in
             guard let snapshot = snapshot else {return}
             
             if let err = err {
